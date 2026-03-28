@@ -1,0 +1,3 @@
+module eclair;
+
+// extern fn int some_library_function();
