@@ -6,7 +6,7 @@
   "dependency-search-paths": [
     "lib"
   ],
-  "dependencies": [],
+  "dependencies": ["dessert"],
   "authors": [
     "John Doe <john.doe@example.com>"
   ],
@@ -20,7 +20,7 @@
   "build-dir": "build",
   "output": "build",
   "targets": {
-    "dessert": {
+    "eclair": {
       "type": "executable"
     }
   },

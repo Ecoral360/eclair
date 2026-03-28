@@ -27,7 +27,7 @@ fn void request_handler(HttpRequest* _req) @private {
 
   foreach (route : routes) {
     if (route.path == target && route.method == method) {
-      route.handler(&req, &res);
+      route.handler(&req, &res)!!;
       break;
     }
   }

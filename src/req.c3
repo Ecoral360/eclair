@@ -1,6 +1,7 @@
 module eclair::req;
 import eclair::httpserver;
 import eclair::constants;
+import dessert;
 
 struct Request {
   HttpRequest* inner;
@@ -17,4 +18,13 @@ fn String Request.target(&self) {
 fn HTTPMethod? Request.method(&self) {
   String method_name = httpserver::http_request_method(self.inner).to_string();
   return HTTPMethod.lookup_field(name, method_name);
+}
+
+fn String Request.body(&self) {
+  return httpserver::http_request_body(self.inner).to_string();
+}
+
+
+macro Request.json_body_as(&self, $Output) {
+  return des::deserialize{$Output}(&&json::deserializer(self.body()));
 }
