@@ -39,6 +39,8 @@ fn void request_handler(HttpRequest* _req) @private {
         String query_key = query_arg[..eq_idx - 1];
         String query_val = query_arg[eq_idx + 1..];
         query.set(query_key, query_val);
+      } else {
+        query.set(query_arg, query_arg);
       }
     }
   }
@@ -52,6 +54,7 @@ fn void request_handler(HttpRequest* _req) @private {
     if (method != route.method) continue;
     if (try params = route.match_target(parts)) {
       req.params = params;
+      req.query = query;
       if (catch route.handler(&req, &res)) {
         io::printfn("Error handling the request at route '%s'", target);
         res.set_status(500);
