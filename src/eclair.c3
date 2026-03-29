@@ -4,19 +4,22 @@ import std::io;
 import std::collections::list;
 import std::collections::map;
 import eclair::route;
+import eclair::router;
+
+macro @show(#expr) {
+  io::printfn("%s: %s", $stringify(#expr), #expr);
+}
 
 struct Server {
   HttpServer *server;
   int port;
 }
 
-List{Route} routes;
+// We need this to be global because we need to access it in request_handler
+Router root_router;
 
 fn void init_routes() @local @init {
-  routes.init(mem);
-}
-fn void free_routes() @local @finalizer {
-  routes.free();
+  root_router = router::new_router("/");
 }
 
 fn void request_handler(HttpRequest* _req) @private {
@@ -24,7 +27,6 @@ fn void request_handler(HttpRequest* _req) @private {
 
   Response res = res::new_response();
   String target = req.target();
-  HTTPMethod method = req.method()!!;
   HashMap{String, String} query;
   query.init(mem);
   defer query.free();
@@ -44,50 +46,40 @@ fn void request_handler(HttpRequest* _req) @private {
       }
     }
   }
+  req.query = query;
 
-  if (target[target.len - 1] == '/') {
-    target = target[..target.len - 2];
-  }
-  String[] parts = target.split(mem, "/");
+  target = target.strip_end("/");
 
-  foreach (route : routes) {
-    if (method != route.method) continue;
-    if (try params = route.match_target(parts)) {
-      req.params = params;
-      req.query = query;
-      if (catch route.handler(&req, &res)) {
-        io::printfn("Error handling the request at route '%s'", target);
-        res.set_status(500);
-        break;
-      }
-      break;
-    }
+  if (!root_router.dispatch_target(target, &req, &res)) {
+    io::print("Not found");
+    res.set_status(404);
+    res.set_body("Not found");
   }
 
   httpserver::http_respond(req.inner, res.inner);
 }
 
-
 fn Server new_server(int port = 8080) {
-  return { 
-    .server = httpserver::http_server_init(port, &request_handler), 
+  return {
+    .server = httpserver::http_server_init(port, &request_handler),
     .port = port,
   };
 }
 
 fn void Server.add_route(&self, Route route) {
-  routes.push(route);
+  root_router.add_route(route);
+}
+
+fn void Server.include_router(&self, Router router) {
+  root_router.routers.push(router);
 }
 
 macro void Server.@add_route(&self, #route) {
-  routes.push(route::@to_route(#route));
+  root_router.@add_route(#route);
 }
 
 fn void Server.listen(&self) {
   io::printfn("Listening on %s", self.port);
+  root_router.print_routes();
   httpserver::http_server_listen(self.server);
 }
-
-
-
-
