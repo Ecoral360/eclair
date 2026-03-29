@@ -1,10 +1,13 @@
 module eclair::req;
 import eclair::httpserver;
 import eclair::constants;
+import std::collections::map;
 import dessert;
 
 struct Request {
   HttpRequest* inner;
+  HashMap{String, String} params;
+  HashMap{String, String} query;
 }
 
 fn Request request_from(HttpRequest* req) {

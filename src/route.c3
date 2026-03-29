@@ -3,6 +3,8 @@ import eclair::httpserver;
 import eclair::req;
 import eclair::res;
 import eclair::constants;
+import std::collections::map;
+import std::io;
 import dessert;
 
 struct RouteConfig {
@@ -15,9 +17,29 @@ attrdef @Route(RouteConfig config) = @tag("eclair:route", config);
 alias RouteHandler = fn void?(Request* req, Response* res);
 
 struct Route {
-  String path;
+  String[] path;
   HTTPMethod method;
   RouteHandler handler;
+}
+
+fn HashMap{String, String}? Route.match_target(&self, String[] target) {
+  HashMap{String, String} map;
+  map.init(mem);
+
+  if (target.len != self.path.len) {
+    return NOT_FOUND~;
+  }
+
+  foreach (i, part : target) {
+    String p = self.path[i];
+    if (p.len > 0 && p[0] == ':') {
+      map.set(p[1..], part);
+    } else if (part != p) {
+      return NOT_FOUND~;
+    }
+  }
+
+  return map;
 }
 
 <* 
@@ -53,8 +75,16 @@ macro Route @to_route(#cb) {
     $endif
   };
 
+  $if $config.path[$config.path.len - 1] == '/':
+    var path = $config.path[..$config.path.len - 2];
+  $else
+    var path = $config.path;
+  $endif
+
+  io::printfn("%s %s", $config.method, path);
+
   return { 
-    .path = $config.path, 
+    .path = path.split(mem, "/"),
     .method = $config.method,
     .handler = handler,
   };
@@ -76,52 +106,4 @@ macro @call_cb($cb, req, res) @local {
     $default:
       return $cb(req, res);
   $endswitch
-}
-
-// macro @handle_post_params($cb, req, res) @local {
-//   var $params = $typeof($cb).paramsof;
-//   var $final_params = {};
-//
-//   $foreach $i, $param : $params :
-//     $switch:
-//       $case $param.type == Request*:
-//         $final_params += {req};
-//     
-//       $case $param.type == Response*:
-//         $final_params +++= res;
-//     $endswitch
-//   $endforeach
-//
-//
-//   return $cb();
-// }
-
-macro Route route($cb, RouteConfig $config) {
-  var handler = fn void(Request* req, Response* res) {
-    $switch:
-      $case $typeof($cb).paramsof.len == 0:
-        var result = $cb();
-
-      $case $typeof($cb).paramsof.len == 1 &&& $typeof($typeof($cb).paramsof[0]) == Request*:
-        var result = $cb(req);
-    
-      $case $typeof($cb).paramsof.len == 1 &&& $typeof($typeof($cb).paramsof[0]) == Response*:
-        var result = $cb(res);
-
-      $default:
-        var result = $cb(req, res);
-    $endswitch
-    
-    $switch:
-      $case $typeof(result) == String:
-        res.set_body(result);
-    $endswitch
-  };
-
-
-  return { 
-    .path = $config.path, 
-    .method = $config.method,
-    .handler = handler,
-  };
 }
