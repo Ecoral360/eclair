@@ -28,14 +28,7 @@ fn void? TodoInput.serialize(&self, Serializer serializer) =>
 fn void? TodoInput.deserialize(&self, Deserializer deserializer) =>
   des::impl_deserialize(self, deserializer);
 
-List{Todo} todos;
-
-fn void init_list() @init {
-  todos.init(mem);
-}
-
 fn List{Todo} get_todos(Request* req) @Route({ GET, "/" }) {
-  io::printfn("query params: %s", req.query);
   return todos;
 }
 
@@ -86,8 +79,23 @@ fn Todo? delete_todo(Request* req) @Route({ DELETE, "/:id" }) {
   return NOT_FOUND~;
 }
 
+fn String hello(Request* req) @Route({ GET, "/hello" }) {
+  String name = req.query["name"] ?? "Stranger";
+  return string::format(mem, "Hello, %s!", name);
+}
+
+/// MAIN PROGRAM
+
+List{Todo} todos;
+
+fn void init_list() @init {
+  todos.init(mem);
+}
+
 fn int main(String[] args) {
   Server server = eclair::new_server();
+  server.@add_route(hello);
+
   Router todo_router = router::new_router("/todos");
   todo_router.@add_route(get_todos);
   todo_router.@add_route(create_todo);
