@@ -18,9 +18,9 @@ fn String Request.target(&self) {
   return httpserver::http_request_target(self.inner).to_string();
 }
 
-fn HTTPMethod? Request.method(&self) {
+fn HTTPMethod Request.method(&self) {
   String method_name = httpserver::http_request_method(self.inner).to_string();
-  return HTTPMethod.lookup_field(name, method_name);
+  return HTTPMethod.lookup_field(name, method_name)!!;
 }
 
 fn String Request.body(&self) {

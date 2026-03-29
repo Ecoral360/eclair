@@ -49,7 +49,7 @@ fn bool Router.dispatch_target(&self, String target, Request* req, Response* res
   String[] parts = target.split(mem, "/");
 
   foreach (route : self.routes) {
-    if (req.method()!! != route.method) continue;
+    if (req.method() != route.method) continue;
     if (try params = route.match_target(parts)) {
       req.params = params;
       if (catch route.handler(req, res)) {
