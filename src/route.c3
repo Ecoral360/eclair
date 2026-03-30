@@ -4,6 +4,7 @@ import eclair::req;
 import eclair::res;
 import eclair::constants;
 import std::collections::map;
+import std::collections::maybe;
 import std::io;
 import dessert;
 
@@ -113,27 +114,61 @@ macro @call_cb($cb, $config, #req, #res) @local {
           args[$i] = &#res;
 
         $default:
-          // get the value from the params HashMap
-          String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
-          // if (catch p) {
-          //   io::eprintn(@sprintf("Error: the param %s is not defined in the path (%s)", $param.name, $config.path));
-          //   return INVALID_PARAM~;
-          // }
-          $switch:
-            $case $param.type == String:
-              args[$i] = &p;
-
-            $case des::@is_deserializable($param.type):
-              $typefrom($param.type)? v = des::deserialize{$param.type}(&&json::deserializer(p));
-              if (catch v) {
-                io::eprintfn("Error while deserializing the param (%s) %s with value: %s", $param.type.nameof, $param.name, p);
-                return INVALID_PARAM~;
-              }
-              args[$i] = &v;
-
-            $default:
-              $error @sprintf("A value of type %s cannot be deserialize", $param.type.nameof);
-          $endswitch
+          var result = @parse_param_value($param.type, $param.name, #req);
+          $if $defined(result!):
+            if (catch result) {
+              result!;
+              return INVALID_PARAM~;
+            }
+          $endif
+          args[$i] = &result;
+          // $switch:
+          //   $case $param.type == String:
+          //     String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
+          //     args[$i] = &p;
+          //
+          //   $case $param.type == bool:
+          //     String p = #req.params[$param.name] ?? #req.query[$param.name];
+          //     p.convert_to_lower();
+          //     switch (p) {
+          //       case "true":
+          //         args[$i] = &&true;
+          //       case "false":
+          //         args[$i] = &&false;
+          //       default:
+          //         io::eprintfn("Error: expected bool value for %s, got %s", $param.name, p);
+          //         return INVALID_PARAM~;
+          //     }
+          //
+          //   $case $param.type == int:
+          //     String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
+          //     int? i = p.to_int();
+          //     if (catch i) {
+          //       io::eprintfn("Error: expected int value for %s, got %s", $param.name, p);
+          //       return INVALID_PARAM~;
+          //     }
+          //     args[$i] = &i;
+          //
+          //   $case $param.type == char:
+          //     String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
+          //     if (p.len != 1) {
+          //       io::eprintfn("Error: expected char value for %s, got %s", $param.name, p);
+          //       return INVALID_PARAM~;
+          //     }
+          //     args[$i] = &p[0];
+          //
+          //   $case des::@is_deserializable($param.type):
+          //     String p = #req.body();
+          //     $typefrom($param.type)? v = des::deserialize{$param.type}(&&json::deserializer(p));
+          //     if (catch v) {
+          //       io::eprintfn("Error while deserializing the param (%s) %s with value: %s", $param.type.nameof, $param.name, p);
+          //       return INVALID_PARAM~;
+          //     }
+          //     args[$i] = &v;
+          //
+          //   $default:
+          //     $error @sprintf("A value of type %s cannot be deserialize", $param.type.nameof);
+          // $endswitch
       $endswitch
     };
   $endforeach
@@ -183,6 +218,70 @@ macro @call_cb_old($cb, req, res) @local {
     $default:
       return $cb(req, res);
   $endswitch
+}
+
+macro @parse_param_value($type, $name, #req) {
+  $typefrom($type) $val;
+  $if @is_maybe($val):
+    var result = @parse_param_value($typeof($val.value), $name, #req);
+    if (catch result) {
+      return $val;
+    } 
+    return maybe::value{$typeof($val.value)}(result);
+  $endif
+
+  $switch:
+    $case $type == String:
+      String p = #req.params[$name] ?? #req.query[$name] ?? #req.body();
+      return p;
+
+    $case $type == bool:
+      String p = #req.params[$name] ?? #req.query[$name]!;
+      p.convert_to_lower();
+      switch (p) {
+        case "true":
+          return true;
+        case "false":
+          return false;
+        default:
+          io::eprintfn("Error: expected bool value for %s, got %s", $name, p);
+          return INVALID_PARAM~;
+      }
+
+    $case $type == int:
+      String p = #req.params[$name] ?? #req.query[$name]!;
+      int? i = p.to_int();
+      if (catch i) {
+        io::eprintfn("Error: expected int value for %s, got %s", $name, p);
+        return INVALID_PARAM~;
+      }
+      return i;
+
+    $case $type == char:
+      String p = #req.params[$name] ?? #req.query[$name]!;
+      if (p.len != 1) {
+        io::eprintfn("Error: expected char value for %s, got %s", $name, p);
+        return INVALID_PARAM~;
+      }
+      return p[0];
+
+    $case des::@is_deserializable($type):
+      String p = #req.body();
+      $typefrom($type)? v = des::deserialize{$type}(&&json::deserializer(p));
+      if (catch v) {
+        io::eprintfn("Error while deserializing the param (%s) %s with value: %s", $type.nameof, $name, p);
+        return INVALID_PARAM~;
+      }
+      return v;
+
+    $default:
+      $error @sprintf("A value of type %s cannot be deserialize", $type.nameof);
+  $endswitch
+}
+
+macro @is_maybe($value) {
+  return ($defined($value.get) &&& $defined($value.get()) &&& 
+          ($defined($value.get()!) ||| $defined($value == maybe::value{$typeof($value.value)}($value.value))));
 }
 
 
