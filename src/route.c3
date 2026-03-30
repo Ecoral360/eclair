@@ -104,36 +104,38 @@ macro @call_cb($cb, $config, #req, #res) @local {
   any[$params.len] args = {};
 
   $foreach $i, $param : $params:
-    $switch:
-      $case $param.type == Request*:
-        args[$i] = &#req;
-    
-      $case $param.type == Response*:
-        args[$i] = &#res;
+    do {
+      $switch:
+        $case $param.type == Request*:
+          args[$i] = &#req;
 
-      $default:
-        // get the value from the params HashMap
-        String? p = #req.params[$param.name];
-        if (catch p) {
-          io::eprintn(@sprintf("Error: the param %s is not defined in the path (%s)", $param.name, $config.path));
-          return INVALID_PARAM~;
-        }
-        $switch:
-          $case $param.type == String:
-            args[$i] = &p;
+        $case $param.type == Response*:
+          args[$i] = &#res;
 
-          $case des::@is_deserializable($param.type):
-            $typefrom($param.type)? v = des::deserialize{$param.type}(&&json::deserializer(p));
-            if (catch v) {
-              io::eprintfn("Error while deserializing the param (%s) %s with value: %s", $param.type.nameof, $param.name, p);
-              return INVALID_PARAM~;
-            }
-            args[$i] = &v;
+        $default:
+          // get the value from the params HashMap
+          String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
+          // if (catch p) {
+          //   io::eprintn(@sprintf("Error: the param %s is not defined in the path (%s)", $param.name, $config.path));
+          //   return INVALID_PARAM~;
+          // }
+          $switch:
+            $case $param.type == String:
+              args[$i] = &p;
 
-          $default:
-            $error @sprintf("A value of type %s cannot be deserialize", $param.type.nameof);
-        $endswitch
-    $endswitch
+            $case des::@is_deserializable($param.type):
+              $typefrom($param.type)? v = des::deserialize{$param.type}(&&json::deserializer(p));
+              if (catch v) {
+                io::eprintfn("Error while deserializing the param (%s) %s with value: %s", $param.type.nameof, $param.name, p);
+                return INVALID_PARAM~;
+              }
+              args[$i] = &v;
+
+            $default:
+              $error @sprintf("A value of type %s cannot be deserialize", $param.type.nameof);
+          $endswitch
+      $endswitch
+    };
   $endforeach
 
   $switch $params.len:
