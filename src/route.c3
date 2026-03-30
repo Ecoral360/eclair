@@ -122,53 +122,6 @@ macro @call_cb($cb, $config, #req, #res) @local {
             }
           $endif
           args[$i] = &result;
-          // $switch:
-          //   $case $param.type == String:
-          //     String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
-          //     args[$i] = &p;
-          //
-          //   $case $param.type == bool:
-          //     String p = #req.params[$param.name] ?? #req.query[$param.name];
-          //     p.convert_to_lower();
-          //     switch (p) {
-          //       case "true":
-          //         args[$i] = &&true;
-          //       case "false":
-          //         args[$i] = &&false;
-          //       default:
-          //         io::eprintfn("Error: expected bool value for %s, got %s", $param.name, p);
-          //         return INVALID_PARAM~;
-          //     }
-          //
-          //   $case $param.type == int:
-          //     String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
-          //     int? i = p.to_int();
-          //     if (catch i) {
-          //       io::eprintfn("Error: expected int value for %s, got %s", $param.name, p);
-          //       return INVALID_PARAM~;
-          //     }
-          //     args[$i] = &i;
-          //
-          //   $case $param.type == char:
-          //     String p = #req.params[$param.name] ?? #req.query[$param.name] ?? #req.body();
-          //     if (p.len != 1) {
-          //       io::eprintfn("Error: expected char value for %s, got %s", $param.name, p);
-          //       return INVALID_PARAM~;
-          //     }
-          //     args[$i] = &p[0];
-          //
-          //   $case des::@is_deserializable($param.type):
-          //     String p = #req.body();
-          //     $typefrom($param.type)? v = des::deserialize{$param.type}(&&json::deserializer(p));
-          //     if (catch v) {
-          //       io::eprintfn("Error while deserializing the param (%s) %s with value: %s", $param.type.nameof, $param.name, p);
-          //       return INVALID_PARAM~;
-          //     }
-          //     args[$i] = &v;
-          //
-          //   $default:
-          //     $error @sprintf("A value of type %s cannot be deserialize", $param.type.nameof);
-          // $endswitch
       $endswitch
     };
   $endforeach
@@ -191,6 +144,66 @@ macro @call_cb($cb, $config, #req, #res) @local {
 
     $case 5:
       return $cb(@acast(args[0], $params[0]), @acast(args[1], $params[1]), @acast(args[2], $params[2]), @acast(args[3], $params[3]), @acast(args[4], $params[4]));
+
+    $case 6:
+      return $cb(
+        @acast(args[0], $params[0]), 
+        @acast(args[1], $params[1]), 
+        @acast(args[2], $params[2]), 
+        @acast(args[3], $params[3]), 
+        @acast(args[4], $params[4]),
+        @acast(args[5], $params[5]),
+      );
+
+    $case 7:
+      return $cb(
+        @acast(args[0], $params[0]), 
+        @acast(args[1], $params[1]), 
+        @acast(args[2], $params[2]), 
+        @acast(args[3], $params[3]), 
+        @acast(args[4], $params[4]),
+        @acast(args[5], $params[5]),
+        @acast(args[6], $params[6]),
+      );
+
+    $case 8:
+      return $cb(
+        @acast(args[0], $params[0]), 
+        @acast(args[1], $params[1]), 
+        @acast(args[2], $params[2]), 
+        @acast(args[3], $params[3]), 
+        @acast(args[4], $params[4]),
+        @acast(args[5], $params[5]),
+        @acast(args[6], $params[6]),
+        @acast(args[7], $params[7]),
+      );
+
+    $case 9:
+      return $cb(
+        @acast(args[0], $params[0]), 
+        @acast(args[1], $params[1]), 
+        @acast(args[2], $params[2]), 
+        @acast(args[3], $params[3]), 
+        @acast(args[4], $params[4]),
+        @acast(args[5], $params[5]),
+        @acast(args[6], $params[6]),
+        @acast(args[7], $params[7]),
+        @acast(args[8], $params[8]),
+      );
+
+    $case 10:
+      return $cb(
+        @acast(args[0], $params[0]), 
+        @acast(args[1], $params[1]), 
+        @acast(args[2], $params[2]), 
+        @acast(args[3], $params[3]), 
+        @acast(args[4], $params[4]),
+        @acast(args[5], $params[5]),
+        @acast(args[6], $params[6]),
+        @acast(args[7], $params[7]),
+        @acast(args[8], $params[8]),
+        @acast(args[9], $params[9]),
+      );
 
     $default:
       $error "Too many argument " +++ $param.len;
