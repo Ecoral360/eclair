@@ -118,7 +118,21 @@ macro @call_cb($cb, $config, #req, #res) @local {
           io::eprintn(@sprintf("Error: the param %s is not defined in the path (%s)", $param.name, $config.path));
           return INVALID_PARAM~;
         }
-        args[$i] = &p;
+        $switch:
+          $case $param.type == String:
+            args[$i] = &p;
+
+          $case des::@is_deserializable($param.type):
+            $typefrom($param.type)? v = des::deserialize{$param.type}(&&json::deserializer(p));
+            if (catch v) {
+              io::eprintfn("Error while deserializing the param (%s) %s with value: %s", $param.type.nameof, $param.name, p);
+              return INVALID_PARAM~;
+            }
+            args[$i] = &v;
+
+          $default:
+            $error @sprintf("A value of type %s cannot be deserialize", $param.type.nameof);
+        $endswitch
     $endswitch
   $endforeach
 

@@ -33,14 +33,14 @@ macro Request.json_body_as(&self, $Output) {
 }
 
 
-struct QueryParamConfig {
-  String name;
-}
-attrdef @Query(QueryParamConfig config) = @tag("eclair:query", config);
-attrdef @Body = @tag("eclair:body");
-
-macro Output? query(Request* req, String name) <Output> {
-  String v = req.query[name]!;
-
-  return des::deserialize{Output}(&&json::deserializer(v));
-}
+// struct QueryParamConfig {
+//   String name;
+// }
+// attrdef @Query(QueryParamConfig config) = @tag("eclair:query", config);
+// attrdef @Body = @tag("eclair:body");
+//
+// macro Output? query(Request* req, String name) <Output> {
+//   String v = req.query[name]!;
+//
+//   return des::deserialize{Output}(&&json::deserializer(v));
+// }
