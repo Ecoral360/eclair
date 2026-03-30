@@ -11,12 +11,14 @@ The framework leverages C3's powerful macro system to provide a declarative, att
 ## Features
 
 - **Declarative Routing**: Define routes using the `@Route` attribute, similar to decorators in FastAPI or attributes in rocket.rs
+- **Automatic Parameter Inference**: Simply add parameters to your handler function - types like `int id`, `String name`, or `bool completed` are automatically extracted from path segments, query parameters, or request bodies
 - **Automatic Response Handling**: Functions returning `String` or serializable types are automatically sent as JSON responses
-- **Path Parameters**: Capture dynamic segments from URLs (e.g., `/todos/:id`)
-- **Query Parameters**: Access query string parameters via `req.query`
-- **JSON Body Parsing**: Automatically deserialize JSON request bodies using `req.json_body_as()`
-- **Maybe Types**: Use `Maybe{T}` for maybe null responses with automatic handling
-- **Optional Returns**: Use `T?` for optional responses with automatic 500 error reporting
+- **Path Parameters**: Capture dynamic segments from URLs - just add a matching parameter (e.g., `int id` for `/todos/:id`)
+- **Query Parameters**: Access query string parameters - add parameters like `Maybe{bool} completed` for optional query params
+- **JSON Body Parsing**: Automatically deserialize JSON request bodies - add a struct parameter and it's automatically parsed
+- **Full requset control**: Use a `Request*` parameter to control everything yourself
+- **Maybe Types**: Use `Maybe{T}` for optional query parameters and `Maybe{T}` for optional return values (returns JSON or null)
+- **Fault Handling**: Make your return type `T?` for error responses with automatic 500 error handling
 - **Routers**: Group routes under a common prefix and include them in the server (sub-routers also supported)
 - **HTTP Method Support**: Support for all standard HTTP methods (GET, POST, PUT, DELETE, PATCH, etc.)
 - **C Interop**: Built on top of [httpserver.h](https://github.com/jeremycw/httpserver.h), a minimal C HTTP server library
@@ -71,7 +73,7 @@ Server server = eclair::new_server(5444); // port will be 5444
 
 ### Routes
 
-Routes are defined using the `@Route` tag with an HTTP method and path. The macro system automatically handles your function to match the expected signature:
+Routes are defined using the `@Route` attribute with an HTTP method and path. The macro system automatically handles parameter inference:
 
 ```c3
 fn String my_handler() @Route({ GET, "/path" }) {
@@ -79,43 +81,56 @@ fn String my_handler() @Route({ GET, "/path" }) {
 }
 ```
 
+Handler functions can have parameters automatically inferred:
+- `Request*` - The request object
+- `Response*` - The response object
+- `int`, `String`, `bool`, `char` - Path or query parameters (matching `:param` in path or `param` in query string)
+- Any deserializable type (`deserializable struct`, `Maybe{deserializable struct}`, `List{deserializable struct}`, or `deserializable struct[]`) - Automatically parsed from the request body
+(see [dessert](https://github.com/Ecoral360/dessert) for more info on deserializable types)
+- `Maybe{int | String | bool | char}` - Optional query parameters
+
 Handler functions can return different types:
 - `String` - Automatically set as the response body
-- Any serializable type (They have a `serialize(Serializer ser)` method, see [dessert](https://github.com/Ecoral360/dessert)) - Automatically serialized to JSON
+- Any serializable type (`serializable struct`, `Maybe{serializable struct}`, `List{serializable struct}`, or `serializable struct[]`) - Automatically serialized to JSON
+(see [dessert](https://github.com/Ecoral360/dessert) for more info on serializable types)
 - `Maybe{T}` - Returns the value as JSON, or `null` if empty
-- `T?` - Returns the value as JSON, or 500 error if the handle returns a `fault`
+- `T?` - Returns the value as JSON, or 500 error if the handler returns a `fault`
 - `void` - Lets the handler function deal with the response
 
 ### Path Parameters
 
-Capture dynamic segments from URLs using `:PARAM` syntax:
+Capture dynamic segments from URLs automatically by adding a matching parameter:
 
 ```c3
-fn Todo? get_todo(Request* req) @Route({ GET, "/todos/:id" }) {
-  int id = req.params["id"].to_int()!;
-  // ... fetch and return todo
+fn Maybe{Todo} get_todo(int id) @Route({ GET, "/todos/:id" }) {
+  foreach (todo : todos) {
+    if (todo.id == id) {
+      return maybe::value{Todo}(todo);  // Wrap value in Maybe
+    }
+  }
+  return {};  // Empty Maybe returns null
 }
 ```
 
 ### Query Parameters
 
-Access query string parameters via `req.query`:
+Access query string parameters automatically using parameters. Use `Maybe{T}` for optional params:
 
 ```c3
-fn String hello(Request* req) @Route({ GET, "/hello" }) {
-  String name = req.query["name"] ?? "Stranger";
-  return string::format(mem, "Hello, %s!", name);
+fn List{Todo} get_todos(Maybe{bool} completed) @Route({ GET, "/todos" }) {
+  // completed is an optional query parameter (?completed=true)
+  // Access with `if (try value = completed.get()) { ... }` or `completed.get() ?? default_value`
 }
 ```
 
 ### JSON Request Bodies
 
-Deserialize JSON request bodies using the `json_body_as` macro:
+Request bodies are automatically deserialized from JSON by adding a deserializable struct parameter:
 
 ```c3
-fn Todo? create_todo(Request* req) @Route({ POST, "/todos" }) {
-  TodoInput input = req.json_body_as(TodoInput)!;
-  // ... create and return todo
+fn Todo? create_todo(TodoInput input) @Route({ POST, "/todos" }) {
+  // TodoInput is automatically parsed from the request body
+  // ...
 }
 ```
 
@@ -125,6 +140,7 @@ Group routes under a common prefix using routers:
 
 ```c3
 fn void main() {
+  // ...
   Router todo_router = router::new_router("/todos");
   todo_router.@add_route(get_todos);
   todo_router.@add_route(create_todo);
@@ -144,12 +160,27 @@ The `Request` and `Response` types give you access to the HTTP transaction:
 fn void handler(Request* req, Response* res) @Route({ GET, "/example" }) {
   // Access request data
   String target = req.target();
-  HTTPMethod method = req.method()!;
+  HTTPMethod method = req.method();
   String body = req.body();
 
   // Set response
   res.set_status(200);
   res.set_body("Hello, world!");
+}
+```
+
+### Fault Handling
+
+Return faults for error responses. The framework automatically handles them:
+
+```c3
+fn Todo? get_todo(int id) @Route({ GET, "/todos/:id" }) {
+  foreach (todo : todos) {
+    if (todo.id == id) {
+      return todo;
+    }
+  }
+  return NOT_FOUND~;  // Returns 500 error
 }
 ```
 
@@ -177,14 +208,42 @@ fn void? Todo.serialize(&self, Serializer serializer) =>
 fn void? Todo.deserialize(&self, Deserializer deserializer) =>
   des::impl_deserialize(self, deserializer);
 
-fn List{Todo} get_todos(Request* req) @Route({ GET, "/" }) { /* ... */ }
-fn Todo? create_todo(Request* req) @Route({ POST, "/" }) { /* ... */ }
-fn Maybe{Todo}? get_todo(Request* req) @Route({ GET, "/:id" }) { /* ... */ }
-fn Todo? update_todo(Request* req) @Route({ PUT, "/:id" }) { /* ... */ }
-fn Todo? delete_todo(Request* req) @Route({ DELETE, "/:id" }) { /* ... */ }
+struct TodoInput {
+  String title;
+  bool completed;
+}
+
+fn void? TodoInput.serialize(&self, Serializer serializer) =>
+  ser::impl_serialize(self, serializer);
+
+fn void? TodoInput.deserialize(&self, Deserializer deserializer) =>
+  des::impl_deserialize(self, deserializer);
+
+// Query parameter - optional (?completed=true or ?completed=false)
+fn List{Todo} get_todos(Maybe{bool} completed) @Route({ GET, "/" }) { /* ... */ }
+
+// Body parameter - inferred from JSON request body
+fn Todo? create_todo(TodoInput input) @Route({ POST, "/" }) { /* ... */ }
+
+// Path parameter - matches :id in route
+fn Maybe{Todo}? get_todo(int id) @Route({ GET, "/:id" }) { /* ... */ }
+
+// Multiple parameters combined
+fn Todo? update_todo(int id, TodoInput input) @Route({ PUT, "/:id" }) { /* ... */ }
+
+// Manual approach still supported
+fn Todo? delete_todo(Request* req) @Route({ DELETE, "/:id" }) {
+  int id = req.params["id"].to_int()!;
+  // ...
+}
+
+fn String hello(Maybe{String} name) @Route({ GET, "/hello" }) {
+  return string::format(mem, "Hello, %s!", name.get() ?? "Stranger");
+}
 
 fn int main(String[] args) {
   Server server = eclair::new_server();
+  server.@add_route(hello);
 
   Router todo_router = router::new_router("/todos");
   todo_router.@add_route(get_todos);
