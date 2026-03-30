@@ -50,10 +50,10 @@ fn void request_handler(HttpRequest* _req) @private {
 
   target = target.strip_end("/");
 
-  if (!root_router.dispatch_target(target, &req, &res)) {
-    io::print("Not found");
+  if (!root_router.dispatch_target(target, target, &req, &res)) {
     res.set_status(404);
-    res.set_body("Not found");
+    io::eprintn(string::format(mem ,"404 Not found '%s'", target));
+    res.set_body(string::format(mem ,"Not found '%s'", target));
   }
 
   httpserver::http_respond(req.inner, res.inner);

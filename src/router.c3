@@ -42,7 +42,7 @@ fn bool Router.match_prefix(&self, String target) @inline {
 }
 
 
-fn bool Router.dispatch_target(&self, String target, Request* req, Response* res) {
+fn bool Router.dispatch_target(&self, String original_target, String target, Request* req, Response* res) {
   if (!self.match_prefix(target)) return false;
 
   target = target[self.prefix.len..];
@@ -53,7 +53,7 @@ fn bool Router.dispatch_target(&self, String target, Request* req, Response* res
     if (try params = route.match_target(parts)) {
       req.params = params;
       if (catch route.handler(req, res)) {
-        io::printfn("Error handling the request at route '%s'", target);
+        io::printfn("Error handling the request at route '%s'", original_target);
         res.set_status(500);
         res.set_body("Error");
       }
@@ -61,7 +61,7 @@ fn bool Router.dispatch_target(&self, String target, Request* req, Response* res
     }
   }
   foreach (router : self.routers) {
-    if (router.dispatch_target(target, req, res)) return true;
+    if (router.dispatch_target(original_target, target, req, res)) return true;
   }
 
   return false;

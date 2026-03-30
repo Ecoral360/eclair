@@ -7,6 +7,8 @@ import std::collections::map;
 import std::io;
 import dessert;
 
+faultdef INVALID_PARAM;
+
 struct RouteConfig {
   HTTPMethod method;
   String path;
@@ -14,13 +16,14 @@ struct RouteConfig {
 
 attrdef @Route(RouteConfig config) = @tag("eclair:route", config);
 
-alias RouteHandler = fn void?(Request* req, Response* res);
 
 struct Route {
   String[] path;
   HTTPMethod method;
   RouteHandler handler;
 }
+
+alias RouteHandler = fn void?(Request* req, Response* res);
 
 fn HashMap{String, String}? Route.match_target(&self, String[] target) {
   HashMap{String, String} map;
@@ -55,11 +58,11 @@ macro Route @to_route(#cb) {
   var handler = fn void?(Request* req, Response* res) {
     $switch:
       $case $return_void:
-        return @call_cb($cb, req, res);
+        return @call_cb($cb, $config, req, res);
       $case $return_void_opt:
-        return @call_cb($cb, req, res)!;
+        return @call_cb($cb, $config, req, res)!;
       $default:
-        var result = @call_cb($cb, req, res);
+        var result = @call_cb($cb, $config, req, res);
         $if $defined(result!):
           if (catch result) {
             result!;
@@ -95,14 +98,67 @@ macro Route @to_route(#cb) {
   };
 }
 
-macro @call_cb($cb, req, res) @local {
+macro @call_cb($cb, $config, #req, #res) @local {
+  var $params = $typeof($cb).paramsof;
+
+  any[$params.len] args = {};
+
+  $foreach $i, $param : $params:
+    $switch:
+      $case $param.type == Request*:
+        args[$i] = &#req;
+    
+      $case $param.type == Response*:
+        args[$i] = &#res;
+
+      $default:
+        // get the value from the params HashMap
+        String? p = #req.params[$param.name];
+        if (catch p) {
+          io::eprintn(@sprintf("Error: the param %s is not defined in the path (%s)", $param.name, $config.path));
+          return INVALID_PARAM~;
+        }
+        args[$i] = &p;
+    $endswitch
+  $endforeach
+
+  $switch $params.len:
+    $case 0:
+      return $cb();
+
+    $case 1:
+      return $cb(@acast(args[0], $params[0]));
+
+    $case 2:
+      return $cb(@acast(args[0], $params[0]), @acast(args[1], $params[1]));
+
+    $case 3:
+      return $cb(@acast(args[0], $params[0]), @acast(args[1], $params[1]), @acast(args[2], $params[2]));
+
+    $case 4:
+      return $cb(@acast(args[0], $params[0]), @acast(args[1], $params[1]), @acast(args[2], $params[2]), @acast(args[3], $params[3]));
+
+    $case 5:
+      return $cb(@acast(args[0], $params[0]), @acast(args[1], $params[1]), @acast(args[2], $params[2]), @acast(args[3], $params[3]), @acast(args[4], $params[4]));
+
+    $default:
+      $error "Too many argument " +++ $param.len;
+
+  $endswitch
+}
+
+macro @acast(arg, $param) {
+  return *anycast(arg, $typefrom($param.type));
+}
+
+macro @call_cb_old($cb, req, res) @local {
   var $params = $typeof($cb).paramsof;
 
   $switch:
     $case $typeof($cb).paramsof.len == 0:
       return $cb();
 
-    $case $typeof($cb).paramsof.len == 1 &&& $typeof($cb).paramsof[0].type == Request*:
+    $case $typeof($cb).paramsof[0].type == Request* &&& ($typeof($cb).paramsof.len == 1 ||| $typeof($cb).paramsof[1].type != Response*):
       return $cb(req);
   
     $case $typeof($cb).paramsof.len == 1 &&& $typeof($cb).paramsof[0].type == Response*:
@@ -112,3 +168,25 @@ macro @call_cb($cb, req, res) @local {
       return $cb(req, res);
   $endswitch
 }
+
+
+///## Proposal
+
+// Being able to add `@tag` attribute to function parameters
+//
+// Syntax to set it :
+// ```c3
+// fn void foo(int bar @tag("")) {
+// }
+// ```
+//
+// Syntax to get it :
+// ```c3
+// macro @print_param_tags(#func) {
+//     $foreach $param : #func.paramsof :
+//     $endforeach
+// }
+// ```
+//
+//
+// ## Motivation
