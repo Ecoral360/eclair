@@ -28,13 +28,15 @@ fn void? TodoInput.serialize(&self, Serializer serializer) =>
 fn void? TodoInput.deserialize(&self, Deserializer deserializer) =>
   des::impl_deserialize(self, deserializer);
 
-fn List{Todo} get_todos(Request* req) @Route({ GET, "/" }) {
+
+// completed is infered to be an optional query parameter of the request
+fn List{Todo} get_todos(Maybe{bool} completed) @Route({ GET, "/" }) {
+  io::printfn("Completed query value: %s", completed);
   return todos;
 }
 
-fn Todo? create_todo(Request* req) @Route({ POST, "/" }) {
-  TodoInput input = req.json_body_as(TodoInput)!;
-
+// TodoInput is inferred to be the body of the request
+fn Todo? create_todo(TodoInput input) @Route({ POST, "/" }) {
   usz new_id = todos.len() + 1;
   Todo new_todo = { .id = (int) new_id, .title = input.title, .completed = input.completed };
   todos.push(new_todo);
@@ -42,8 +44,8 @@ fn Todo? create_todo(Request* req) @Route({ POST, "/" }) {
   return new_todo;
 }
 
-fn Maybe{Todo}? get_todo(Request* req) @Route({ GET, "/:id" }) {
-  int id = req.params["id"].to_int()!;
+// id is inferred to be the value of ':id', and will be converted to an int automatically
+fn Maybe{Todo}? get_todo(int id) @Route({ GET, "/:id" }) {
   foreach (todo : todos) {
     if (todo.id == id) {
       return maybe::value{Todo}(todo);
@@ -52,10 +54,8 @@ fn Maybe{Todo}? get_todo(Request* req) @Route({ GET, "/:id" }) {
   return {};
 }
 
-fn Todo? update_todo(Request* req) @Route({ PUT, "/:id" }) {
-  TodoInput input = req.json_body_as(TodoInput)!;
-
-  int id = req.params["id"].to_int()!;
+// TodoInput is inferred to be the body of the request, and id the value of ':id'
+fn Todo? update_todo(int id, TodoInput input) @Route({ PUT, "/:id" }) {
   foreach (todo : &todos) {
     if (todo.id == id) {
       todo.id = id;
@@ -68,8 +68,10 @@ fn Todo? update_todo(Request* req) @Route({ PUT, "/:id" }) {
   return NOT_FOUND~;
 }
 
+// You can still do it manually
 fn Todo? delete_todo(Request* req) @Route({ DELETE, "/:id" }) {
   int id = req.params["id"].to_int()!;
+
   foreach (i, todo : todos) {
     if (todo.id == id) {
       todos.remove_at(i);
@@ -79,10 +81,12 @@ fn Todo? delete_todo(Request* req) @Route({ DELETE, "/:id" }) {
   return NOT_FOUND~;
 }
 
-fn String hello(Request* req) @Route({ GET, "/hello" }) {
-  String name = req.query["name"] ?? "Stranger";
-  return string::format(mem, "Hello, %s!", name);
+fn String hello(Maybe{String} name) @Route({ GET, "/hello" }) {
+  return string::format(mem, "Hello, %s!", name.get() ?? "Stranger");
 }
+
+
+
 
 /// MAIN PROGRAM
 
@@ -90,6 +94,10 @@ List{Todo} todos;
 
 fn void init_list() @init {
   todos.init(mem);
+}
+
+struct User {
+  String name;
 }
 
 fn int main(String[] args) {
@@ -108,3 +116,4 @@ fn int main(String[] args) {
   server.listen();
   return 0;
 }
+

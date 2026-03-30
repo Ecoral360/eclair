@@ -224,15 +224,17 @@ macro @parse_param_value($type, $name, #req) {
   $typefrom($type) $val;
   $if @is_maybe($val):
     var result = @parse_param_value($typeof($val.value), $name, #req);
-    if (catch result) {
-      return $val;
-    } 
+    $if $defined(result!):
+      if (catch result) {
+        return $val;
+      }
+    $endif
     return maybe::value{$typeof($val.value)}(result);
   $endif
 
   $switch:
     $case $type == String:
-      String p = #req.params[$name] ?? #req.query[$name] ?? #req.body();
+      String p = #req.params[$name] ?? #req.query[$name]!;
       return p;
 
     $case $type == bool:
