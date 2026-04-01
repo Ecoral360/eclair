@@ -66,25 +66,25 @@
       "dependencies" : [],
       "linked-libraries" : []
     },
-    "wasm32" : {
-      "link-args" : [],
-      "dependencies" : [],
-      "linked-libraries" : []
-    },
-    "wasm64" : {
-      "link-args" : [],
-      "dependencies" : [],
-      "linked-libraries" : []
-    },
-    "windows-aarch64" : {
-      "link-args" : [],
-      "dependencies" : [],
-      "linked-libraries" : []
-    },
-    "windows-x64" : {
-      "link-args" : [],
-      "dependencies" : [],
-      "linked-libraries" : []
-    }
+    //"wasm32" : {
+    //  "link-args" : [],
+    //  "dependencies" : [],
+    //  "linked-libraries" : []
+    //},
+    //"wasm64" : {
+    //  "link-args" : [],
+    //  "dependencies" : [],
+    //  "linked-libraries" : []
+    //},
+    //"windows-aarch64" : {
+    //  "link-args" : [],
+    //  "dependencies" : [],
+    //  "linked-libraries" : []
+    //},
+    //"windows-x64" : {
+    //  "link-args" : [],
+    //  "dependencies" : [],
+    //  "linked-libraries" : []
+    //}
   }
 }
