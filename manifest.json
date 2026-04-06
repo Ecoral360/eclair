@@ -3,12 +3,15 @@
   "sources" : [ "src/**" ],
   "c-sources": ["csource/**"],
   "c-include-dirs": ["csource/include"],
-  "deps": [
-    { 
-      "name": "dessert",
-      "source": "ecoral360/dessert.c3l"
-    }
-  ],
+  "dependencies": ["dessert"],
+  "vendor": {
+    "c3po": [
+      { 
+        "name": "dessert",
+        "source": "ecoral360/dessert.c3l"
+      }
+    ]
+  },
   "linklib-dir" : "linked-libs",
   "targets" : {
     "android-aarch64" : {
