@@ -3,7 +3,7 @@
   "sources" : [ "src/**" ],
   "c-sources": ["csource/**"],
   "c-include-dirs": ["csource/include"],
-  "dependencies": [
+  "deps": [
     { 
       "name": "dessert",
       "source": "ecoral360/dessert.c3l"
