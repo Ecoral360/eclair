@@ -3,7 +3,9 @@
   "sources" : [ "src/**" ],
   "c-sources": ["csource/**"],
   "c-include-dirs": ["csource/include"],
-  "dependencies": ["ecoral360/dessert.c3l"],
+  "dependencies": {
+    "dessert": "ecoral360/dessert.c3l"
+  },
   "linklib-dir" : "linked-libs",
   "targets" : {
     "android-aarch64" : {
